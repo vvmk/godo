@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -102,4 +103,16 @@ func fetchC(url string, ch chan<- string) {
 
 	secs := time.Since(start).Seconds()
 	ch <- fmt.Sprintf("%.2fs	%7d	%s", secs, nbytes, url)
+}
+
+// startServer starts a server that will receive and store todo messages
+// and respond to list queries from godo clients
+func startServer() {
+	http.HandleFunc("/", handler) // each request calls handler
+	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+
+// handler just echos back the url path
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "URL.Path = %q\n", r.URL.Path)
 }
