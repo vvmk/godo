@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,7 +17,22 @@ import (
 var mu sync.Mutex
 var count int
 
+// temporary in memory todo repo
+var lists = make(map[string][]string)
+
+var listName = flag.String("l", "Inbox", "name of the list to which this item will be added")
+
 func main() {
+	// TODO: zero command line args crashes
+	flag.Parse()
+
+	todo := strings.Join(flag.Args(), " ")
+
+	if os.Args[1] == "ls" {
+		listTodos()
+		return
+	}
+
 	// fetch a single url
 	if os.Args[1] == "fetch" {
 		fetch(os.Args[2:])
@@ -32,11 +48,24 @@ func main() {
 	if os.Args[1] == "server" {
 		startServer()
 	}
-	// get text passed to godo
-	input := strings.Join(os.Args[1:], " ")
 
-	// spit it back out
-	fmt.Println(input)
+	addTodo(*listName, todo)
+
+}
+
+// addTodo adds a todo item to the in-memory store under the given list
+// name.
+func addTodo(listName string, todo string) {
+	lists[listName] = append(lists[listName], todo)
+}
+
+func listTodos() {
+	for k, list := range lists {
+		fmt.Printf("[ %s ]\n", k)
+		for i, t := range list {
+			fmt.Printf("\t%d : %s\n", i, t)
+		}
+	}
 }
 
 func testConnection() {
