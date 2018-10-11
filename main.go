@@ -2,6 +2,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -56,7 +58,29 @@ func main() {
 // addTodo adds a todo item to the in-memory store under the given list
 // name.
 func addTodo(listName string, todo string) {
-	lists[listName] = append(lists[listName], todo)
+	//lists[listName] = append(lists[listName], todo)
+	url := "http://localhost:8001"
+
+	body := struct {
+		list string
+		body string
+	}{
+		listName,
+		todo,
+	}
+
+	data, err := json.Marshal(body)
+	if err != nil {
+		log.Fatalf("JSON marshaling failed: %s", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "addTodo: POST to %s failed: %v\n", url, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("\nStatus: %v\n", resp.Status)
 }
 
 func listTodos() {
@@ -148,6 +172,8 @@ func startServer() {
 	http.HandleFunc("/count", counter)
 	http.HandleFunc("/request", request)
 
+	http.HandleFunc("/add", add)
+
 	log.Fatal(http.ListenAndServe("localhost:8000", nil))
 }
 
@@ -184,6 +210,10 @@ func request(w http.ResponseWriter, r *http.Request) {
 	for k, v := range r.Form {
 		fmt.Fprintf(w, "Form[%q] = %q\n", k, v)
 	}
+}
+
+func add(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "body: %v", r.Body)
 }
 
 func gcd(x, y int) int {
