@@ -19,8 +19,15 @@ import (
 var mu sync.Mutex
 var count int
 
+// A Todo is a thing I need to do...go figure.
+type Todo struct {
+	Body      string    `json:"body"`
+	Completed bool      `json:"completed"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // temporary in memory todo repo
-var lists = make(map[string][]string)
+var lists = make(map[string][]Todo)
 
 var listName = flag.String("l", "Inbox", "name of the list to which this item will be added")
 
@@ -63,7 +70,7 @@ func addTodo(listName string, todo string) {
 
 	body := struct {
 		list string
-		body string
+		todo string
 	}{
 		listName,
 		todo,
@@ -79,6 +86,7 @@ func addTodo(listName string, todo string) {
 		fmt.Fprintf(os.Stderr, "addTodo: POST to %s failed: %v\n", url, err)
 		os.Exit(1)
 	}
+	defer resp.Body.Close()
 
 	fmt.Printf("\nStatus: %v\n", resp.Status)
 }
@@ -87,7 +95,7 @@ func listTodos() {
 	for k, list := range lists {
 		fmt.Printf("[ %s ]\n", k)
 		for i, t := range list {
-			fmt.Printf("\t%d : %s\n", i, t)
+			fmt.Printf("\t%d : %v\n", i, t)
 		}
 	}
 }
@@ -108,6 +116,7 @@ func fetch(args []string) {
 			fmt.Fprintf(os.Stderr, "fetch: %v\n", err)
 			os.Exit(1)
 		}
+		defer resp.Body.Close()
 
 		_, err = io.Copy(os.Stdout, resp.Body)
 		if err != nil {
@@ -153,9 +162,9 @@ func fetchC(url string, ch chan<- string) {
 		ch <- fmt.Sprint(err) // send to channel ch
 		return
 	}
+	defer resp.Body.Close()
 
 	nbytes, err := io.Copy(ioutil.Discard, resp.Body)
-	resp.Body.Close() // don't leak resources
 	if err != nil {
 		ch <- fmt.Sprintf("while reading %s: %v", url, err)
 		return
@@ -172,7 +181,7 @@ func startServer() {
 	http.HandleFunc("/count", counter)
 	http.HandleFunc("/request", request)
 
-	http.HandleFunc("/add", add)
+	http.HandleFunc("/add", createTodo)
 
 	log.Fatal(http.ListenAndServe("localhost:8000", nil))
 }
@@ -212,13 +221,23 @@ func request(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func add(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "body: %v", r.Body)
-}
-
-func gcd(x, y int) int {
-	for y != 0 {
-		x, y = y, x%y
+func createTodo(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var b struct {
+		list string
+		todo string
 	}
-	return x
+
+	err := decoder.Decode(&b)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	t := Todo{
+		Body:      b.todo,
+		Completed: false,
+		CreatedAt: time.Now(),
+	}
+
+	lists[b.list] = append(lists[b.list], t)
 }
