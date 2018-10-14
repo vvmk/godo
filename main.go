@@ -38,7 +38,7 @@ func main() {
 	todo := strings.Join(flag.Args(), " ")
 
 	if os.Args[1] == "ls" {
-		listTodos()
+		getTodos()
 		return
 	}
 
@@ -65,7 +65,6 @@ func main() {
 // addTodo adds a todo item to the in-memory store under the given list
 // name.
 func addTodo(listName string, todo string) {
-	//lists[listName] = append(lists[listName], todo)
 	url := "http://localhost:8001"
 
 	body := struct {
@@ -91,18 +90,29 @@ func addTodo(listName string, todo string) {
 	fmt.Printf("\nStatus: %v\n", resp.Status)
 }
 
-func listTodos() {
-	for k, list := range lists {
-		fmt.Printf("[ %s ]\n", k)
-		for i, t := range list {
-			fmt.Printf("\t%d : %v\n", i, t)
-		}
-	}
-}
-
 func testConnection() {
 	// ping server
 	fmt.Println("testing connection...not really")
+}
+
+// getTodos requests a dump of all todos saved to the server
+func getTodos() {
+	url := "http://localhost:8001/todos"
+
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "getTodos: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(os.Stdout, resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "getTodos: reading %s: %v\n", url, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("\nStatus: %v\n", resp.Status)
 }
 
 // fetch makes a GET request to the supplied url strings (args) and
@@ -182,8 +192,9 @@ func startServer() {
 	http.HandleFunc("/request", request)
 
 	http.HandleFunc("/add", createTodo)
+	http.HandleFunc("/todos", listTodos)
 
-	log.Fatal(http.ListenAndServe("localhost:8000", nil))
+	log.Fatal(http.ListenAndServe("localhost:8001", nil))
 }
 
 // handler just echos back the url path
@@ -240,4 +251,14 @@ func createTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lists[b.list] = append(lists[b.list], t)
+}
+
+func listTodos(w http.ResponseWriter, r *http.Request) {
+	rString, err := json.Marshal(lists)
+	if err != nil {
+		panic(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(rString)
 }
