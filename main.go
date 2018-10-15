@@ -79,9 +79,6 @@ func addTodo(listName string, todo string) {
 		log.Fatalf("JSON marshaling failed: %s", err)
 	}
 
-	fmt.Printf("body: %v\n", body)
-	fmt.Printf("data: %s\n", data)
-
 	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "addTodo: POST to %s failed: %v\n", url, err)
@@ -108,7 +105,22 @@ func getTodos() {
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(os.Stdout, resp.Body)
+	var t map[string][]Todo
+	decoder := json.NewDecoder(resp.Body)
+
+	err = decoder.Decode(&t)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "getTodos: %v\n", err)
+		os.Exit(1)
+	}
+
+	prettyResp, err := json.MarshalIndent(t, "", "    ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "getTodos: %v\n", err)
+		os.Exit(1)
+	}
+
+	_, err = io.Copy(os.Stdout, bytes.NewReader(prettyResp))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "getTodos: reading %s: %v\n", url, err)
 		os.Exit(1)
@@ -236,6 +248,7 @@ func request(w http.ResponseWriter, r *http.Request) {
 
 func createTodo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
+
 	var b struct {
 		List string
 		Todo string
