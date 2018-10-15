@@ -59,26 +59,28 @@ func main() {
 	}
 
 	addTodo(*listName, todo)
-
 }
 
 // addTodo adds a todo item to the in-memory store under the given list
 // name.
 func addTodo(listName string, todo string) {
-	url := "http://localhost:8001"
+	url := "http://localhost:8001/create"
 
 	body := struct {
-		list string
-		todo string
+		List     string `json:"list"`
+		TodoBody string `json:"todo"`
 	}{
-		listName,
-		todo,
+		List:     listName,
+		TodoBody: todo,
 	}
 
 	data, err := json.Marshal(body)
 	if err != nil {
 		log.Fatalf("JSON marshaling failed: %s", err)
 	}
+
+	fmt.Printf("body: %v\n", body)
+	fmt.Printf("data: %s\n", data)
 
 	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
 	if err != nil {
@@ -191,7 +193,7 @@ func startServer() {
 	http.HandleFunc("/count", counter)
 	http.HandleFunc("/request", request)
 
-	http.HandleFunc("/add", createTodo)
+	http.HandleFunc("/create", createTodo)
 	http.HandleFunc("/todos", listTodos)
 
 	log.Fatal(http.ListenAndServe("localhost:8001", nil))
@@ -235,8 +237,8 @@ func request(w http.ResponseWriter, r *http.Request) {
 func createTodo(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var b struct {
-		list string
-		todo string
+		List string
+		Todo string
 	}
 
 	err := decoder.Decode(&b)
@@ -245,12 +247,25 @@ func createTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t := Todo{
-		Body:      b.todo,
+		Body:      b.Todo,
 		Completed: false,
 		CreatedAt: time.Now(),
 	}
 
-	lists[b.list] = append(lists[b.list], t)
+	key := b.List
+
+	lists[key] = append(lists[key], t)
+
+	thisTodo := lists[key][len(lists[key])-1]
+	log.Printf("added todo: '%s' to list: '%s' at %v", thisTodo.Body, key, thisTodo.CreatedAt)
+
+	tData, err := json.Marshal(t)
+	if err != nil {
+		panic(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(tData)
 }
 
 func listTodos(w http.ResponseWriter, r *http.Request) {
