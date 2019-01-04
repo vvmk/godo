@@ -19,6 +19,8 @@ import (
 var mu sync.Mutex
 var count int
 
+var baseURL = "http://godo-web.test/"
+
 // A Todo is a thing I need to do...go figure.
 type Todo struct {
 	Body      string    `json:"body"`
@@ -64,7 +66,7 @@ func main() {
 // addTodo adds a todo item to the in-memory store under the given list
 // name.
 func addTodo(listName string, todo string) {
-	url := "http://localhost:8001/create"
+	url := baseURL + "create"
 
 	body := struct {
 		List     string `json:"list"`
@@ -96,7 +98,7 @@ func testConnection() {
 
 // getTodos requests a dump of all todos saved to the server
 func getTodos() {
-	url := "http://localhost:8001/todos"
+	url := baseURL + "todos"
 
 	resp, err := http.Get(url)
 	if err != nil {
